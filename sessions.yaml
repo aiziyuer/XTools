@@ -1,0 +1,16 @@
+---
+ssh_uri: jenkins@moyi-lc.com:49183
+ssh_identity: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+  QyNTUxOQAAACATQwMkiaCP7I4nOFvBPomMZJT+1PTyLnkwyHuaXJWDMQAAAKArmOrvK5jq
+  7wAAAAtzc2gtZWQyNTUxOQAAACATQwMkiaCP7I4nOFvBPomMZJT+1PTyLnkwyHuaXJWDMQ
+  AAAEAfpUur6iMOKhzxRc4TiWkKCBXLLSuY3JU+V4PLyiYGrxNDAySJoI/sjic4W8E+iYxk
+  lP7U9PIueTDIe5pclYMxAAAAFnlvdXJfZW1haWxAZXhhbXBsZS5jb20BAgMEBQYH
+  -----END OPENSSH PRIVATE KEY-----
+ssh_passwd:
+ssh_tunnels:
+   - R=>:6666=>localhost:22
+   - L=>:6666=>localhost:22
+
+---
