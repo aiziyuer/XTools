@@ -1,5 +1,11 @@
 ---
+#
+#
+#
 ssh_uri: jenkins@moyi-lc.com:49183
+ssh_user: jenkins
+ssh_host: moyi-lc.com
+ssh_port: 49183
 ssh_identity: |
   -----BEGIN OPENSSH PRIVATE KEY-----
   b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -10,7 +16,9 @@ ssh_identity: |
   -----END OPENSSH PRIVATE KEY-----
 ssh_passwd:
 ssh_tunnels:
-   - R=>:6666=>localhost:22
+   # 监听端口: nc -lp 4444  查看端口: netstat -anp
+   # ssh -NTR 0.0.0.0:6666:localhost:389 jenkins@moyi-lc.com
+   - R=>:6666=>localhost:3389
    - L=>:6666=>localhost:22
 
 ---

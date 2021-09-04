@@ -1,28 +1,58 @@
 package cmd
 
 import (
+	"app/util"
 	"bytes"
+	"fmt"
 	"github.com/gogf/gf/os/gfile"
 	"github.com/gogf/gf/util/gconv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
 	"io"
+	"io/ioutil"
+	"net"
 	"os"
+	"regexp"
 )
 
+type TunnelInfo struct {
+	Mode    string
+	SrcHost string
+	SrcPort int
+	DstHost string
+	DstPort int
+}
+
 type SessionInfo struct {
-	SshUri      string   `yaml:"ssh_uri"`
-	SshIdentity string   `yaml:"ssh_identity"`
-	SshTunnels  []string `yaml:"ssh_tunnels"`
+	SshUri        string   `yaml:"ssh_uri"`
+	SshUser       string   `yaml:"ssh_user,omitempty"`
+	SshHost       string   `yaml:"ssh_host,omitempty"`
+	SshPort       int      `yaml:"ssh_port,omitempty"`
+	SshIdentity   string   `yaml:"ssh_identity"`
+	SshTunnelUris []string `yaml:"ssh_tunnels"`
+	SshTunnels    []TunnelInfo
+}
+
+func publicKeysByPrivateKeyContent(privateKeyContent string) ssh.AuthMethod {
+
+	buffer := gconv.Bytes(privateKeyContent)
+
+	key, err := ssh.ParsePrivateKey(buffer)
+	if err != nil {
+		zap.S().Fatalf("Cannot parse SSH public key content: %s", privateKeyContent)
+		return nil
+	}
+	return ssh.PublicKeys(key)
 }
 
 var rootCmd = &cobra.Command{
 	Use: "SshTunnel",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var sessionInfos []SessionInfo
+		var sessionInfos []*SessionInfo
 
 		decoder := yaml.NewDecoder(bytes.NewReader(gfile.GetBytes("sessions.yaml")))
 		for {
@@ -34,10 +64,107 @@ var rootCmd = &cobra.Command{
 				}
 				break
 			}
-			sessionInfos = append(sessionInfos, s)
+
+			// 忽略无效的记录
+			if len(s.SshUri) == 0 || len(s.SshHost) == 0 {
+				continue
+			}
+
+			sessionInfos = append(sessionInfos, &s)
 		}
 
+		for _, session := range sessionInfos {
+			for _, tunnelUri := range session.SshTunnelUris {
+				m := util.NamedStringSubMatch(
+					regexp.MustCompile(
+						`(?P<mode>(L|R))=>(?P<src_host>.*):(?P<src_port>\d+)=>(?P<dst_host>.+):(?P<dst_port>\d+)`,
+					),
+					tunnelUri)
+
+				if len(m) == 0 {
+					zap.S().Warnf("tunnelUri: %s, which is not valid.", gconv.Strings(tunnelUri))
+					continue
+				}
+
+				zap.S().Debugf("%s", gconv.Strings(m))
+				session.SshTunnels = append(session.SshTunnels, TunnelInfo{
+					Mode:    m["mode"],
+					SrcHost: util.GetAnyString(m["src_host"], "0.0.0.0"),
+					SrcPort: gconv.Int(m["src_port"]),
+					DstHost: m["dst_host"],
+					DstPort: gconv.Int(m["dst_port"]),
+				})
+			}
+		}
 		zap.S().Infof("sessionInfos: %s", gconv.Strings(sessionInfos))
+
+		for _, session := range sessionInfos {
+
+			sshConfig := &ssh.ClientConfig{
+				// SSH connection username
+				User: session.SshUser,
+				Auth: []ssh.AuthMethod{
+					// put here your private key path
+					publicKeysByPrivateKeyContent(session.SshIdentity),
+				},
+				HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			}
+
+			for _, tunnelInfo := range session.SshTunnels {
+
+				switch tunnelInfo.Mode {
+				case "R":
+					func() {
+						// Connect to SSH remote server using serverEndpoint
+						serverConn, err := ssh.Dial("tcp",
+							fmt.Sprintf("%s:%d", session.SshHost, session.SshPort),
+							sshConfig,
+						)
+						if err != nil {
+							zap.S().Fatalf("Dial INTO remote server error: %s", err)
+						}
+
+						// Listen on remote server port
+						listener, err := serverConn.Listen("tcp",
+							fmt.Sprintf("%s:%d", tunnelInfo.SrcHost, tunnelInfo.SrcPort),
+						)
+						if err != nil {
+							zap.S().Fatalf("Listen open port ON remote server error: %s", err)
+						}
+
+						defer func() {
+							_ = listener.Close()
+							_ = serverConn.Close()
+						}()
+
+						for {
+							out, err := net.Dial("tcp",
+								fmt.Sprintf("%s:%d", tunnelInfo.DstHost, tunnelInfo.DstPort))
+							if err != nil {
+								zap.S().Fatalf("Dial INTO local service error: %s", err)
+							}
+
+							in, err := listener.Accept()
+							if err != nil {
+								zap.S().Fatal(err)
+							}
+
+							ch := make(chan error, 2)
+							go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
+							go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
+
+						}
+
+					}()
+
+					break
+				case "L":
+
+					break
+				}
+
+			}
+		}
 
 		return nil
 	},
