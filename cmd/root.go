@@ -4,6 +4,7 @@ import (
 	"app/util"
 	"bytes"
 	"fmt"
+	"github.com/avast/retry-go"
 	"github.com/gogf/gf/os/gfile"
 	"github.com/gogf/gf/util/gconv"
 	"github.com/spf13/cobra"
@@ -114,14 +115,15 @@ var rootCmd = &cobra.Command{
 
 				switch tunnelInfo.Mode {
 				case "R":
-					func() {
+					err := retry.Do(func() error {
 						// Connect to SSH remote server using serverEndpoint
 						serverConn, err := ssh.Dial("tcp",
 							fmt.Sprintf("%s:%d", session.SshHost, session.SshPort),
 							sshConfig,
 						)
 						if err != nil {
-							zap.S().Fatalf("Dial INTO remote server error: %s", err)
+							zap.S().Errorf("Dial INTO remote server error: %s", err)
+							return err
 						}
 
 						// Listen on remote server port
@@ -129,7 +131,8 @@ var rootCmd = &cobra.Command{
 							fmt.Sprintf("%s:%d", tunnelInfo.SrcHost, tunnelInfo.SrcPort),
 						)
 						if err != nil {
-							zap.S().Fatalf("Listen open port ON remote server error: %s", err)
+							zap.S().Errorf("Listen open port ON remote server error: %s", err)
+							return err
 						}
 
 						defer func() {
@@ -141,12 +144,13 @@ var rootCmd = &cobra.Command{
 							out, err := net.Dial("tcp",
 								fmt.Sprintf("%s:%d", tunnelInfo.DstHost, tunnelInfo.DstPort))
 							if err != nil {
-								zap.S().Fatalf("Dial INTO local service error: %s", err)
+								zap.S().Errorf("Dial INTO local service error: %s", err)
+								return err
 							}
 
 							in, err := listener.Accept()
 							if err != nil {
-								zap.S().Fatal(err)
+								return err
 							}
 
 							ch := make(chan error, 2)
@@ -155,7 +159,20 @@ var rootCmd = &cobra.Command{
 
 						}
 
-					}()
+					},
+						retry.Attempts(5),
+					)
+					if err != nil {
+						zap.S().Fatalf(
+							"tunnel(R=>%s:%d=>%s:%d) build failed: %s.",
+							tunnelInfo.SrcHost,
+							tunnelInfo.SrcPort,
+							tunnelInfo.DstHost,
+							tunnelInfo.DstPort,
+							err,
+						)
+						return err
+					}
 
 					break
 				case "L":

@@ -3,6 +3,7 @@ module app
 go 1.15
 
 require (
+	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/go-resty/resty/v2 v2.4.0
 	github.com/gogf/gf v1.16.6
 	github.com/magiconair/properties v1.8.4 // indirect
