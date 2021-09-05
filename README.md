@@ -1,7 +1,18 @@
 项目说明
 ===
 
-##  
+## 自启动
+``` bash
+# 新增服务
+sc create ssh-tunnel-daemon binPath="C:\Users\ziyu0\GolandProjects\XTunnel\ssh-tunnel-daemon.exe" type=share start=auto
+
+# 删除服务
+sc delete ssh-tunnel-daemon
+
+# 启动服务
+sc start ssh-tunnel-daemon
+
+```
 
 ## 隧道建立操作
 
