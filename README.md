@@ -12,6 +12,9 @@ sc delete ssh-tunnel-daemon
 # 启动服务
 sc start ssh-tunnel-daemon
 
+# 编译
+go build -o ssh-tunnel.exe app/cmd/ssh-tunnel
+
 ```
 
 ## 隧道建立操作
