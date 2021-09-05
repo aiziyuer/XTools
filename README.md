@@ -1,6 +1,9 @@
 项目说明
 ===
 
+##  
+
+## 隧道建立操作
 
 ```bash
 # 准备动作
@@ -32,3 +35,7 @@ chmod 600 ~/.ssh/config ~/.ssh/jenkins@moyi-lc.com
 # 建立隧道
 
 ```
+
+## FAQ
+
+- [golang工程最佳实践](https://github.com/golang-standards/project-layout)
