@@ -1,2 +1,11 @@
-sr-iov:
-  
+# vgpu的分配
+vgpu-partition:
+   - GRID_A100_3_20C
+   - GRID_A100_2_10C
+   - GRID_A100_1_5C
+   - GRID_A100_1_5C
+   # - GRID_A100_2_10C
+   # - GRID_A100_3_20C
+   # - GRID_A100_4_20C
+   # - GRID_A100_7_40C
+    
