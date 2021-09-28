@@ -1,52 +1,12 @@
 项目说明
 ===
 
-## 自启动
-``` bash
-# 新增服务
-sc create ssh-tunnel-daemon binPath="C:\Users\ziyu0\GolandProjects\XTunnel\ssh-tunnel-daemon.exe" type=share start=auto
-
-# 删除服务
-sc delete ssh-tunnel-daemon
-
-# 启动服务
-sc start ssh-tunnel-daemon
-
-# 编译
-go build -o ssh-tunnel.exe app/cmd/ssh-tunnel
-
-```
 
 ## 隧道建立操作
 
 ```bash
-# 准备动作
-mkdir -p ~/.ssh && touch ~/.ssh/config
-# 私钥
-cat <<'EOF'>~/.ssh/jenkins@moyi-lc.com
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACATQwMkiaCP7I4nOFvBPomMZJT+1PTyLnkwyHuaXJWDMQAAAKArmOrvK5jq
-7wAAAAtzc2gtZWQyNTUxOQAAACATQwMkiaCP7I4nOFvBPomMZJT+1PTyLnkwyHuaXJWDMQ
-AAAEAfpUur6iMOKhzxRc4TiWkKCBXLLSuY3JU+V4PLyiYGrxNDAySJoI/sjic4W8E+iYxk
-lP7U9PIueTDIe5pclYMxAAAAFnlvdXJfZW1haWxAZXhhbXBsZS5jb20BAgMEBQYH
------END OPENSSH PRIVATE KEY-----
-EOF
-
-# 设置认证信息
-sed -i -e '/# moyi-lc.com start/,/# moyi-lc.com end/d' ~/.ssh/config
-cat <<'EOF'>>~/.ssh/config
-# moyi-lc.com start
-Host moyi-lc.com
-  User jenkins
-  Port 49183
-  IdentityFile ~/.ssh/jenkins@moyi-lc.com
-# moyi-lc.com end
-EOF
-chmod 600 ~/.ssh/config ~/.ssh/jenkins@moyi-lc.com
-
-
 # 建立隧道
+./XTunnel run
 
 ```
 
