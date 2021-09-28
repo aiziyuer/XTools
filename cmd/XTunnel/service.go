@@ -1,13 +1,14 @@
 package main
 
 import (
-	"app/internal/ssh_tunnel"
+	"app/internal/xtunnel"
 	"fmt"
-	"github.com/kardianos/service"
-	"github.com/spf13/cobra"
 	"log"
 	"os"
 	"time"
+
+	"github.com/kardianos/service"
+	"github.com/spf13/cobra"
 )
 
 type program struct {
@@ -23,7 +24,7 @@ func (p *program) Start(s service.Service) error {
 	return nil
 }
 func (p *program) run() {
-	h := &ssh_tunnel.TunnelHandler{}
+	h := &xtunnel.TunnelHandler{}
 	_ = h.Do()
 }
 func (p *program) Stop(s service.Service) error {

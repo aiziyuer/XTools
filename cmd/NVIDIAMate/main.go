@@ -3,17 +3,18 @@ package main
 import (
 	"app/internal"
 	"app/internal/util"
+	"os"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"os"
 )
 
 var rootCmd = &cobra.Command{
-	Use: "XTunnel",
+	Use: "nvida-mate",
 }
 
 func main() {
-	util.SetupLogs("./log/info.log")
+	util.SetupLogs("./log/nvida-mate.log")
 	if err := rootCmd.Execute(); err != nil {
 		zap.S().Error(err)
 		os.Exit(1)

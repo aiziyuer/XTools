@@ -1,19 +1,20 @@
-package ssh_tunnel
+package xtunnel
 
 import (
 	util2 "app/internal/util"
 	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net"
+	"regexp"
+
 	"github.com/avast/retry-go"
 	"github.com/gogf/gf/os/gfile"
 	"github.com/gogf/gf/util/gconv"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
-	"io"
-	"io/ioutil"
-	"net"
-	"regexp"
 )
 
 type TunnelInfo struct {
@@ -41,7 +42,7 @@ func (t *TunnelHandler) Do() error {
 
 	var sessionInfos []*SessionInfo
 
-	decoder := yaml.NewDecoder(bytes.NewReader(gfile.GetBytes("configs/config.yaml")))
+	decoder := yaml.NewDecoder(bytes.NewReader(gfile.GetBytes("configs/XTunnel.yaml")))
 	for {
 		var s SessionInfo
 		if err := decoder.Decode(&s); err != nil {

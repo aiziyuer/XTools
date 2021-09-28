@@ -1,0 +1,11 @@
+{
+    "recommendations": [
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens",
+        "vscode-icons-team.vscode-icons",
+        "golang.go",
+        "coenraads.bracket-pair-colorizer",
+        "ms-ceintl.vscode-language-pack-zh-hans",
+        "codezombiech.gitignore"
+    ]
+}
