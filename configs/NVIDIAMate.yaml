@@ -1,11 +1,14 @@
 # vgpu的分配
 vgpu-partition:
-   - GRID_A100_3_20C
-   - GRID_A100_2_10C
-   - GRID_A100_1_5C
-   - GRID_A100_1_5C
-   # - GRID_A100_2_10C
-   # - GRID_A100_3_20C
-   # - GRID_A100_4_20C
-   # - GRID_A100_7_40C
+   # nvidia-smi mig -cgi 9,14,19,19
+   # uuidgen --sha1 --namespace @dns --name "[001]GRID_A100_3_20C"
+   # uuidgen --sha1 --namespace @dns --name "[001]GRID_A100_3_20C" > 0000:1e:00.4/mdev_supported_types/nvidia-476/create
+   - GRID_A100_3_20C # 9
+   - GRID_A100_2_10C # 14
+   - GRID_A100_1_5C # 19
+   - GRID_A100_1_5C # 19
+   # - GRID_A100_2_10C # 14
+   # - GRID_A100_3_20C # 9
+   # - GRID_A100_4_20C # 5
+   # - GRID_A100_7_40C # 0
     
