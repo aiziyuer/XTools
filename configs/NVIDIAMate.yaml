@@ -2,38 +2,38 @@
 mig_vgpus:
   - bus_id: 00000000:1E:00.0
 
-   # 查询设备的设备信息
-   # grep -E '.+' /sys/class/mdev_bus/*/mdev_supported_types/*/ -r
+    # 查询设备的设备信息
+    # grep -E '.+' /sys/class/mdev_bus/*/mdev_supported_types/*/ -r
 
-   # 过滤出支持的设备名字
-   # grep -E '.+' /sys/class/mdev_bus/*/mdev_supported_types/*/ -r 2>&1 | grep name
-   # 查询到profile的名字
-   # nvidia-smi mig --list-gpu-instance-profiles
-   # - GRID A100-1-5C # 19
-   # - GRID A100-1-5CME # 20
-   # - GRID A100-2-10C # 14
-   # - GRID A100-3-20C # 9
-   # - GRID A100-4-20C # 5
-   # - GRID A100-7-40C # 0
+    # 过滤出支持的设备名字
+    # grep -E '.+' /sys/class/mdev_bus/*/mdev_supported_types/*/ -r 2>&1 | grep name
+    # 查询到profile的名字
+    # nvidia-smi mig --list-gpu-instance-profiles
+    # - GRID A100-1-5C # 19
+    # - GRID A100-1-5CME # 20
+    # - GRID A100-2-10C # 14
+    # - GRID A100-3-20C # 9
+    # - GRID A100-4-20C # 5
+    # - GRID A100-7-40C # 0
 
-   # 创建vgpu
-   # nvidia-smi mig -dci; nvidia-smi mig -dgi; nvidia-smi mig -cgi 9,14,19,19 -C
+    # 创建vgpu
+    # nvidia-smi mig -dci; nvidia-smi mig -dgi; nvidia-smi mig -cgi 9,14,19,19 -C
 
-   # 查询可用vgpu
-   # uuidgen --sha1 --namespace @dns --name "1" > /sys/class/mdev_bus/0000:1e:00.4/mdev_supported_types/nvidia-476/create
+    # 查询可用vgpu
+    # uuidgen --sha1 --namespace @dns --name "1" > /sys/class/mdev_bus/0000:1e:00.4/mdev_supported_types/nvidia-476/create
 
-   # 可用设备查询
-   # ls -ahl /sys/bus/mdev/devices
-   partition:
+    # 可用设备查询
+    # ls -ahl /sys/bus/mdev/devices
+    partition:
       b04965e6-a9bb-591f-8f8a-1adcb2c8dc39: # uuidgen --sha1 --namespace @dns --name "1"
-         name: GRID A100-3-20C
+        name: GRID A100-3-20C
       4b166dbe-d99d-5091-abdd-95b83330ed3a: # uuidgen --sha1 --namespace @dns --name "2"
-         name: GRID A100-2-10C
+        name: GRID A100-2-10C
       98123fde-012f-5ff3-8b50-881449dac91a: # uuidgen --sha1 --namespace @dns --name "3"
-         name: A100-1-5C
+        name: A100-1-5C
       6ed955c6-506a-5343-9be4-2c0afae02eef: # uuidgen --sha1 --namespace @dns --name "4"
-         name: A100-1-5C
-   
+        name: A100-1-5C
+
       # 打开virtual function功能(slot:bus:domain.func)
       # /usr/lib/nvidia/sriov-manage -e 00000000:1E:00.0
       # /usr/lib/nvidia/sriov-manage -e ALL

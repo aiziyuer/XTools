@@ -3,7 +3,9 @@ module app
 go 1.15
 
 require (
+	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/avast/retry-go v3.0.0+incompatible
+	github.com/ghodss/yaml v1.0.0
 	github.com/go-resty/resty/v2 v2.4.0
 	github.com/gogf/gf v1.16.6
 	github.com/kardianos/service v1.2.0

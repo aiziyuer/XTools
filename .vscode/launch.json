@@ -14,7 +14,7 @@
       },
       "debugAdapter": "legacy",
       "showLog": true,
-      "program": "${workspaceFolder}/cmd/NVIDIAMate/main.go",
+      "program": "${workspaceFolder}/cmd/NVIDIAMate",
       "args": ["run"],
       "cwd": "${workspaceFolder}"
     }
