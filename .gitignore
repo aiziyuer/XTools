@@ -4,3 +4,5 @@ log/*
 vendor/*
 !vendor/.gitkeep
 output/*
+__debug_bin
+NVIDIAMate
