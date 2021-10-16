@@ -66,7 +66,7 @@ func SetupLogs(logFileName string) {
 			CallerKey:     "",
 			StacktraceKey: "",
 		}), zapcore.Lock(os.Stdout), zap.LevelEnablerFunc(func(level zapcore.Level) bool {
-			return level >= zapcore.InfoLevel
+			return level >= zapcore.DebugLevel
 		})),
 	), zap.AddCaller())
 	zap.ReplaceGlobals(logger)
