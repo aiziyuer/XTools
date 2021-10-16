@@ -6,11 +6,12 @@
   "configurations": [
     {
       "name": "Launch Package",
-      "type": "go",
+      "type": "go", 
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/NVIDIAMate",
-      "args": ["--run"]
+      "args": ["run"],
+      "cwd": "${workspaceFolder}"        
     }
   ]
 }

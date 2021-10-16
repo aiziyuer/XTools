@@ -14,6 +14,9 @@ var rootCmd = &cobra.Command{
 }
 
 func main() {
+
+	zap.S().Debug(os.Args)
+
 	util.SetupLogs("./log/nvida-mate.log")
 	if err := rootCmd.Execute(); err != nil {
 		zap.S().Error(err)
