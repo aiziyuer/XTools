@@ -1,0 +1,101 @@
+#! /usr/bin/env stap
+
+%{
+#include <linux/socket.h>		// For AF_INET & AF_INET6
+%}
+
+/**
+
+# 编译
+sudo yum install -y kernel-devel-3.10.0-327.ali2014.alios7.x86_64
+sudo yum install -y kernel-debuginfo-3.10.0-327.ali2014.alios7.x86_64
+stap -r 3.10.0-327.ali2014.alios7.x86_64 outgoing.stp -m outgoing -p4 -g
+
+# 运行加载
+sudo yum install -y systemtap-runtime
+sudo staprun outgoing.ko
+
+# 调试
+sudo stap outgoing.stp
+*/
+
+global tcp_x_connect, tcp_sendmsg, udp_sendmsg
+
+probe kernel.function("tcp_v4_connect").return {
+
+    saddr   = format_ipaddr(__ip_sock_saddr(@entry($sk)), __ip_sock_family(@entry($sk)))
+    daddr   = format_ipaddr(__ip_sock_daddr(@entry($sk)), __ip_sock_family(@entry($sk)))
+    // sport   = __tcp_sock_sport(@entry($sk))
+    dport   = __tcp_sock_dport(@entry($sk))
+
+    # 忽略回环数据
+    if(daddr == "127.0.0.1" || daddr == "0.0.0.0" ) next;
+
+    tcp_x_connect[saddr, daddr, dport] <<< 1
+
+}
+
+probe tcp.sendmsg {
+
+    family  = __ip_sock_family($sk)
+    if(family != %{ /* pure */ AF_INET %}) next;
+
+    saddr   = format_ipaddr(__ip_sock_saddr($sk), family)
+    daddr   = format_ipaddr(__ip_sock_daddr($sk), family)
+    sport   = __tcp_sock_sport($sk)
+    dport   = __tcp_sock_dport($sk)
+
+    # 忽略回环数据
+    if(daddr == "127.0.0.1" || daddr == "0.0.0.0" ) next;
+
+    # 源地址不是随机端口说明可能是本机监听服务并不算客户端流量
+    if(sport < 49151) next;
+
+    tcp_sendmsg[saddr, daddr, dport] <<< 1
+    tcp_x_connect[saddr, daddr, dport] <<< 1
+}
+
+probe udp.sendmsg {
+
+    family  = __ip_sock_family($sk)
+    if(family != %{ /* pure */ AF_INET %}) next;
+    
+    saddr   = format_ipaddr(__ip_sock_saddr($sk), family)
+    daddr   = format_ipaddr(__ip_sock_daddr($sk), family)
+    sport   = __tcp_sock_sport($sk)
+    dport   = __tcp_sock_dport($sk)
+
+    # 忽略回环数据
+    if(daddr == "127.0.0.1" || daddr == "0.0.0.0" ) next;
+
+    # 源地址不是随机端口说明可能是本机监听服务并不算客户端流量
+    if(sport < 49151) next;
+
+    udp_sendmsg[saddr, daddr, dport] <<< 1
+    tcp_x_connect[saddr, daddr, dport] <<< 1
+}
+
+
+probe timer.ms(1000) {
+
+  printf(" ===================== TCP NEW   =========================\n")
+  printf("src,dest,count\n")
+  foreach([saddr, daddr, dport] in tcp_x_connect) {
+    printf("%s,%s:%d,%d\n",saddr, daddr, dport, @count(tcp_x_connect[saddr, daddr, dport]) );
+  }
+
+  // printf(" ===================== TCP Trans =========================\n")
+  // foreach([saddr, daddr, dport] in tcp_sendmsg) {
+  //   printf(" %15s %15s %5d %5d\n",saddr, daddr, dport, @count(tcp_sendmsg[saddr, daddr, dport]) );
+  // }
+
+  // printf(" ===================== UDP Trans =========================\n")
+  // foreach([saddr, daddr, dport] in udp_sendmsg) {
+  //   printf(" %15s %15s %5d %5d\n",saddr, daddr, dport, @count(udp_sendmsg[saddr, daddr, dport]) );
+  // }
+
+  delete tcp_x_connect
+  delete tcp_sendmsg
+  delete udp_sendmsg
+
+}
