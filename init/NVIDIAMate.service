@@ -1,0 +1,14 @@
+[Unit]
+Description=NVIDIAMate run
+Before=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/XTools
+ExecStart=/usr/local/bin/NVIDIAMate run
+TimeoutStartSec=0
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

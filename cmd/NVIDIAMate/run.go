@@ -30,7 +30,7 @@ var runCmd = &cobra.Command{
 	Use: "run",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		configObject, err := util.YamlFileToObject("configs/NVIDIAMate.yaml")
+		configObject, err := util.YamlFileToObject("/root/.config/NVIDIAMate/NVIDIAMate.yaml")
 		if err != nil {
 			return err
 		}
@@ -118,8 +118,9 @@ var runCmd = &cobra.Command{
 				_, _ = exec.Command("bash", "-c", cmd).CombinedOutput()
 
 				mdevDevices = append(mdevDevices, mdevDevice)
-
 			}
+
+			zap.S().Debugf("[gpu-%03d] COMMAND: mdevctl list", gpu_index)
 
 		}
 
