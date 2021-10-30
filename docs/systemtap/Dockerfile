@@ -62,7 +62,7 @@ RUN \
 
 RUN \
   yum --enablerepo base-debuginfo install -y \
-        kernel-debuginfo-${KERNEL_VERSION} kernel-debuginfo-common-$(uname -m)-${KERNEL_VERSION} \
+        kernel-debuginfo-${KERNEL_VERSION} kernel-debuginfo-common-${KERNEL_VERSION} \
   && yum clean all
 
 # 测试生效
