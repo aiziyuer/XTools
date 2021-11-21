@@ -30,8 +30,10 @@ var runCmd = &cobra.Command{
 	Use: "run",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		configObject, err := util.YamlFileToObject("/root/.config/NVIDIAMate/NVIDIAMate.yaml")
+		configFile := "/root/.config/NVIDIAMate/NVIDIAMate.yaml"
+		configObject, err := util.YamlFileToObject(configFile)
 		if err != nil {
+			zap.S().Errorf("configFile: %s parse with error: %s", configFile, err)
 			return err
 		}
 

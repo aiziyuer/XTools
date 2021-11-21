@@ -6,6 +6,7 @@
         "golang.go",
         "coenraads.bracket-pair-colorizer",
         "ms-ceintl.vscode-language-pack-zh-hans",
-        "codezombiech.gitignore"
+        "codezombiech.gitignore",
+        "coolbear.systemd-unit-file"
     ]
 }

@@ -10,12 +10,12 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use: "nvida-mate",
+	Use: "NVIDIAMate",
 }
 
 func main() {
 
-	util.SetupLogs("./log/nvida-mate.log")
+	util.SetupLogs("./log/NVIDIAMate.log")
 	if err := rootCmd.Execute(); err != nil {
 		zap.S().Error(err)
 		os.Exit(1)

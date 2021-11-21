@@ -2,12 +2,20 @@
 ===
 
 
-## 隧道建立操作
+## XTunnel使用
 
 ```bash
 # 建立隧道
 ./XTunnel run
 
+```
+
+## NVIDIAMate使用
+
+```
+mkdir -p ~/.config/NVIDIAMate
+cp config/NVIDIAMate.yaml ~/.config/NVIDIAMate/
+go run app/cmd/NVIDIAMate run
 ```
 
 ## FAQ

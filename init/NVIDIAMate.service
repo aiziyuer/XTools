@@ -4,7 +4,7 @@ Before=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/XTools
+WorkingDirectory=/var/log/NVIDIAMate
 ExecStart=/usr/local/bin/NVIDIAMate run
 TimeoutStartSec=0
 Restart=on-failure
