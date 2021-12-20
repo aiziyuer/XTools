@@ -1,6 +1,6 @@
 # vgpu的分配
 gpus:
-  - bus_id: 00000000:1E:00.0 # DBDF(domain:bus:slot.function)
+  - bus_id: 00000000:1D:00.0 # DBDF(domain:bus:slot.function)
     mig: 1 # 1: enable, 0: disable
 
     # 查询设备的设备信息
