@@ -126,7 +126,11 @@ var runCmd = &cobra.Command{
 
 		}
 
-		zap.S().Infof("mdevDevices: %s", gconv.String(mdevDevices))
+		output, stderr := exec.Command("mdevctl", "list").CombinedOutput()
+		if stderr != nil {
+			return stderr
+		}
+		zap.S().Infof("COMMAND: mdevctl list\n%s", output)
 
 		return nil
 	},

@@ -8,7 +8,8 @@ WorkingDirectory=/var/log/NVIDIAMate
 ExecStart=/usr/local/bin/NVIDIAMate run
 TimeoutStartSec=0
 Restart=on-failure
-RestartSec=30
+RemainAfterExit=yes
+RestartSec=10
 
 [Install]
 WantedBy=default.target
