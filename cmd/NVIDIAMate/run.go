@@ -86,11 +86,11 @@ var runCmd = &cobra.Command{
 			vgpus := util.MustJsonPathQueryInObject(gpu, "$.vgpus")
 			zap.S().Debugf("[gpu-%03d] vgpus: %s", gpu_index, gconv.String(vgpus))
 
-			// nvidia-smi mig -dci; nvidia-smi mig -dgi; nvidia-smi mig -cgi 9,14,19,19 -C
-			zap.S().Debugf("[gpu-%03d] COMMAND: nvidia-smi mig -dci; nvidia-smi mig -dgi; nvidia-smi mig -cgi 9,14,19,19 -C", gpu_index)
+			// nvidia-smi mig -dci; nvidia-smi mig -dgi; nvidia-smi mig -cgi 9,14,14 -C
+			zap.S().Debugf("[gpu-%03d] COMMAND: nvidia-smi mig -dci; nvidia-smi mig -dgi; nvidia-smi mig -cgi 9,14,14 -C", gpu_index)
 			_, _ = exec.Command("nvidia-smi", "mig", "-dci").CombinedOutput()
 			_, _ = exec.Command("nvidia-smi", "mig", "-dgi").CombinedOutput()
-			_, _ = exec.Command("nvidia-smi", "mig", "-cgi", "9,14,19,19", "-C").CombinedOutput()
+			_, _ = exec.Command("nvidia-smi", "mig", "-cgi", "9,14,14", "-C").CombinedOutput()
 
 			for vgpu_index, vgpu := range vgpus.([]interface{}) {
 
