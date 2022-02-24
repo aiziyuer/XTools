@@ -1,53 +1,21 @@
 ARG VERSION=7.6.1810
-ARG KERNEL_VERSION=3.10.0-1160.42.2.el7
+# ARG KERNEL_VERSION=3.10.0-957
 
-
-FROM centos:$VERSION
+FROM centos:7.9.2009
 ARG VERSION
-ARG KERNEL_VERSION
+# ARG KERNEL_VERSION
 
 ENV VERSION=$VERSION
-ENV KERNEL_VERSION=$KERNEL_VERSION
+# ENV KERNEL_VERSION=$KERNEL_VERSION
 
-RUN \
-rm -rf /etc/yum.repos.d/*.repo \
-&& printf "\n\
-[base]\n\
-name=Base\n\
-baseurl=https://mirrors.moyi-lc.com:5001/centos-vault/${VERSION}/os/\$basearch/\n\
-gpgcheck=0\n\
-enabled=1\n\
-\n\
-[updates]\n\
-name=Updates\n\
-baseurl=https://mirrors.moyi-lc.com:5001/centos-vault/${VERSION}/updates/\$basearch/\n\
-gpgcheck=0\n\
-enabled=1\n\
-\n\
-[extras]\n\
-name=Extras\n\
-baseurl=https://mirrors.moyi-lc.com:5001/centos-vault/${VERSION}/extras/\$basearch/\n\
-gpgcheck=0\n\
-enabled=1\n\
-\n\
-[centosplus]\n\
-name=CentOSPlus\n\
-baseurl=https://mirrors.moyi-lc.com:5001/centos-vault/${VERSION}/centosplus/\$basearch/\n\
-gpgcheck=0\n\
-enabled=1\n\
-\n\
-[fasttrack]\n\
-name=Fasttrack\n\
-baseurl=https://mirrors.moyi-lc.com:5001/centos-vault/${VERSION}/fasttrack/\$basearch/\n\
-gpgcheck=0\n\
-enabled=1\n\
-\n\
-[base-debuginfo]\n\
-name=Debuginfo\n\
-baseurl=http://mirrors.moyi-lc.com:5001/centos-debuginfo/7/\$basearch/\n\
-gpgcheck=0\n\
-enabled=0\n\
-" > /etc/yum.repos.d/CentOS.repo
+# 配置私人加速源
+RUN true \
+&& sed -i 's%^mirrorlist=%#mirrorlist=%g; s%^#baseurl=%baseurl=%g' /etc/yum.repos.d/*.repo \
+&& sed -i 's%http://debuginfo.centos.org/%http://mirrors.moyi-lc.com:5000/centos-debuginfo/%g' /etc/yum.repos.d/CentOS-*.repo \
+&& sed -i 's%http://vault.centos.org/%http://mirrors.moyi-lc.com:5000/centos-vault/%g' /etc/yum.repos.d/CentOS-*.repo \
+&& sed -i 's%http://mirror.centos.org/altarch/%http://mirrors.moyi-lc.com:5000/centos-altarch/%g' /etc/yum.repos.d/CentOS-*.repo \
+&& sed -i 's%http://mirror.centos.org/%http://mirrors.moyi-lc.com:5000/%g' /etc/yum.repos.d/CentOS-*.repo \
+&& true
 
 # 安装软件包
 RUN \
@@ -55,16 +23,25 @@ RUN \
         systemtap systemtap-runtime bash-completion \
   && yum clean all
 
-# 必要的软件包
-RUN \
-  yum install -y \
-        kernel-${KERNEL_VERSION} kernel-devel-${KERNEL_VERSION} \
-  && yum clean all
+# 尽可能使能必要的仓库
+RUN true \
+&& yum-config-manager --disable {base,updates} \
+&& yum-config-manager --enable C${VERSION}-* \
+&& yum repolist | grep C${VERSION} || yum-config-manager --enable {base,updates} \
+&& yum-config-manager --enable base-debuginfo || true \
+&& true
 
-RUN \
-  yum --enablerepo base-debuginfo install -y \
-        kernel-debuginfo-${KERNEL_VERSION} kernel-debuginfo-common-${KERNEL_VERSION} \
-  && yum clean all
+# 必要的软件包: kernel, kernel-devel, kernel-debuginfo
+# RUN true \
+# && yum --showduplicates list kernel | awk '{print $2}' \
+#     | xargs -n1 -I{} yum install -y kernel-{} kernel-devel-{} kernel-debuginfo-{} kernel-debuginfo-common-*-{}\
+# && yum clean all
+
+# 恢复仓库
+RUN true \
+&& yum-config-manager --enable {base,updates} \
+&& true
+
 
 # 测试生效
 #stap -ve 'probe begin { log("hello world") exit() }'

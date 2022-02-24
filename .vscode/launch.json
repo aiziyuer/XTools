@@ -5,6 +5,20 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "FileStream run",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "env": {
+        "DEBUG_AS_ROOT": "true"
+      },
+      "debugAdapter": "legacy",
+      "showLog": true,
+      "program": "${workspaceFolder}/cmd/FileStream",
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
       "name": "NVIDIAMate run",
       "type": "go",
       "request": "launch",
