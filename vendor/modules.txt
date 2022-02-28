@@ -6,6 +6,9 @@ github.com/PaesslerAG/jsonpath
 # github.com/avast/retry-go v3.0.0+incompatible
 ## explicit
 github.com/avast/retry-go
+# github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
+## explicit
+github.com/coreos/go-systemd/daemon
 # github.com/fsnotify/fsnotify v1.4.9
 github.com/fsnotify/fsnotify
 # github.com/ghodss/yaml v1.0.0

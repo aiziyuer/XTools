@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/avast/retry-go v3.0.0+incompatible
+	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
 	github.com/ghodss/yaml v1.0.0
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-resty/resty/v2 v2.4.0
