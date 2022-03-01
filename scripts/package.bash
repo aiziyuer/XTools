@@ -22,6 +22,8 @@ for APP in $(ls cmd); do
             # 在项目根目录构建
             execute "mkdir -p ${BUILD_DIR}"
             execute "cp -rf $WORK_DIR/configs ${BUILD_DIR}/"
+            execute "export GO111MODULE=on"
+            execute "export GOPROXY=https://nexus.moyi-lc.com:5003/repository/go-group/"
             execute "cd $WORK_DIR && go mod vendor && go build -v -o ${BUILD_DIR}/${APP} app/cmd/${APP}"
             execute "cd ${BUILD_DIR} && tar czvf ../${RELEASE}.tar.gz *"
 
