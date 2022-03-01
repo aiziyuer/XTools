@@ -3,15 +3,22 @@ package main
 import (
 	"app/internal/util"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/coreos/go-systemd/daemon"
+	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
 	"github.com/gogf/gf/os/gfile"
+	"github.com/gogf/gf/text/gregex"
 	"github.com/gogf/gf/text/gstr"
 	"github.com/gogf/gf/util/gconv"
 	"github.com/jasonlvhit/gocron"
@@ -23,64 +30,134 @@ import (
 var appName = "XtraceExporter"
 var listenPort = 9900
 var center_host = "127.0.0.1"
+var sessionMap = make(map[string]*Session, 0)
+
+type Std_out_err_t struct {
+	data io.ReadCloser
+}
+
+func (s Std_out_err_t) Read() string {
+	data, _ := ioutil.ReadAll(s.data)
+	return string(data)
+}
+
+type Session struct {
+	Name   string
+	Cmd    *exec.Cmd
+	Stdout Std_out_err_t
+	Stderr Std_out_err_t
+}
 
 var mainCmd = &cobra.Command{
-	Use:   appName,
-	Short: "File Server By Stream",
-	Long:  `File Server By Stream.`,
+	Use:        appName,
+	Aliases:    []string{},
+	SuggestFor: []string{},
+	Short:      appName,
+	Long:       appName,
+	Example:    "",
 	Run: func(cmd *cobra.Command, args []string) {
-
 		sig := make(chan os.Signal)
 		signal.Notify(sig, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		done := make(chan bool, 1)
-
 		go func() {
 			msg := <-sig
 			zap.S().Warnf("receive msg: %s", gconv.String(msg))
 			done <- true
 		}()
-
-		// 定时任务
 		go func() {
-
 			gocron.Every(1).Second().Do(func() {
-				fmt.Println("I am running task.")
 				cmd := fmt.Sprintf("rsync -av rsync://%s/scripts/ /scripts &> /tmp/rsync.log", center_host)
 				if _, err := exec.Command("bash", "-c", cmd).CombinedOutput(); err != nil {
 					zap.S().Errorf("cmd: %s has errors:\n%s", cmd, err)
 				}
 			})
+			gocron.Every(1).Second().Do(func() {
+				if files, err := ioutil.ReadDir("/scripts/"); err != nil {
+					log.Fatal(err)
+				} else {
+					for _, file := range files {
+						if file.IsDir() || !gstr.HasSuffix(file.Name(), "stp") {
+							continue
+						}
 
+						module_name := strings.TrimSuffix(file.Name(), filepath.Ext(file.Name()))
+						if _, ok := sessionMap[module_name]; !ok {
+							cmd := exec.Command(
+								"/usr/bin/stap",
+								"-g",
+								"-m",
+								fmt.Sprintf("__xtrace_%s", module_name),
+								fmt.Sprintf("/scripts/%s", file.Name()),
+							)
+							stdout, _ := cmd.StdoutPipe()
+							stderr, _ := cmd.StderrPipe()
+							cmd.SysProcAttr = &syscall.SysProcAttr{
+								Pdeathsig: syscall.SIGTERM, // 子进程跟随父进程一起停止
+							}
+							zap.S().Debugf("command:\n%s", cmd.String())
+							if err = cmd.Start(); err != nil {
+								zap.S().Errorf("cmd: %s has error: %s.", cmd, err)
+							}
+							sessionMap[module_name] = &Session{Cmd: cmd, Stdout: Std_out_err_t{stdout}, Stderr: Std_out_err_t{stderr}}
+						}
+					}
+				}
+			})
 			<-gocron.Start()
-
 		}()
-
-		// watch文件服务
-
-		// web  服务
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			log.Fatal("NewWatcher failed: ", err)
+		}
+		defer watcher.Close()
 		go func() {
-
+			for {
+				select {
+				case event, ok := <-watcher.Events:
+					if !ok {
+						return
+					}
+					switch event.Op {
+					case fsnotify.Write, fsnotify.Rename, fsnotify.Create:
+						if !gregex.IsMatchString(`^.+.stp$`, event.Name) {
+							continue
+						}
+					default:
+						continue
+					}
+					_, fileName := filepath.Split(event.Name)
+					module_name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+					if s, ok := sessionMap[module_name]; ok {
+						syscall.Kill(s.Cmd.Process.Pid, syscall.SIGTERM)
+						ioutil.NopCloser(s.Stderr.data)
+						ioutil.NopCloser(s.Stdout.data)
+						s.Cmd.Process.Wait()
+						delete(sessionMap, module_name)
+					}
+				case err, ok := <-watcher.Errors:
+					if !ok {
+						return
+					}
+					zap.S().Errorf("error:", err)
+				}
+			}
+		}()
+		if err = watcher.Add("/scripts"); err != nil {
+			zap.S().Fatal("Add failed:", err)
+		}
+		go func() {
 			r := gin.Default()
-
 			r.GET("/:script_name", func(c *gin.Context) {
 				script_name := c.Param("script_name")
 				module_name := fmt.Sprintf("__xtrace_%s", gstr.TrimRightStr(script_name, ".stp"))
-
 				file_name := fmt.Sprintf("/proc/systemtap/%s/metrics", module_name)
 				zap.S().Infof("file_name: %s", file_name)
 				c.String(http.StatusOK, gfile.GetContents(file_name))
-
 			})
-
 			r.Run(fmt.Sprintf(":%d", listenPort))
-
 		}()
-
-		// 正常通知systemd服务已经启动
 		daemon.SdNotify(false, daemon.SdNotifyReady)
-
 		<-done
-
 	},
 }
 
