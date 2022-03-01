@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/coreos/go-systemd/daemon"
@@ -30,7 +31,10 @@ import (
 var appName = "XtraceExporter"
 var listenPort = 9900
 var center_host = "127.0.0.1"
-var sessionMap = make(map[string]*Session, 0)
+var sessionMap sync.Map
+
+// var sessionMap = make(map[string]*Session, 0)
+var lock = sync.RWMutex{}
 
 type Std_out_err_t struct {
 	data io.ReadCloser
@@ -81,25 +85,36 @@ var mainCmd = &cobra.Command{
 						}
 
 						module_name := strings.TrimSuffix(file.Name(), filepath.Ext(file.Name()))
-						if _, ok := sessionMap[module_name]; !ok {
-							cmd := exec.Command(
-								"/usr/bin/stap",
-								"-g",
-								"-m",
-								fmt.Sprintf("__xtrace_%s", module_name),
-								fmt.Sprintf("/scripts/%s", file.Name()),
-							)
-							stdout, _ := cmd.StdoutPipe()
-							stderr, _ := cmd.StderrPipe()
-							cmd.SysProcAttr = &syscall.SysProcAttr{
-								Pdeathsig: syscall.SIGTERM, // 子进程跟随父进程一起停止
-							}
-							zap.S().Debugf("command:\n%s", cmd.String())
-							if err = cmd.Start(); err != nil {
-								zap.S().Errorf("cmd: %s has error: %s.", cmd, err)
-							}
-							sessionMap[module_name] = &Session{Cmd: cmd, Stdout: Std_out_err_t{stdout}, Stderr: Std_out_err_t{stderr}}
+
+						for {
+							func() {
+
+								lock.RLock()
+								defer lock.RUnlock()
+
+								if _, ok := sessionMap.Load(module_name); !ok {
+									cmd := exec.Command(
+										"/usr/bin/stap",
+										"-g",
+										"-m",
+										fmt.Sprintf("__xtrace_%s", module_name),
+										fmt.Sprintf("/scripts/%s", file.Name()),
+									)
+									stdout, _ := cmd.StdoutPipe()
+									stderr, _ := cmd.StderrPipe()
+									cmd.SysProcAttr = &syscall.SysProcAttr{
+										Pdeathsig: syscall.SIGTERM, // 子进程跟随父进程一起停止
+									}
+									zap.S().Debugf("command:\n%s", cmd.String())
+									if err = cmd.Start(); err != nil {
+										zap.S().Errorf("cmd: %s has error: %s.", cmd, err)
+									}
+									sessionMap.Store(module_name, &Session{Cmd: cmd, Stdout: Std_out_err_t{stdout}, Stderr: Std_out_err_t{stderr}})
+								}
+
+							}()
 						}
+
 					}
 				}
 			})
@@ -127,13 +142,27 @@ var mainCmd = &cobra.Command{
 					}
 					_, fileName := filepath.Split(event.Name)
 					module_name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
-					if s, ok := sessionMap[module_name]; ok {
-						syscall.Kill(s.Cmd.Process.Pid, syscall.SIGTERM)
-						ioutil.NopCloser(s.Stderr.data)
-						ioutil.NopCloser(s.Stdout.data)
-						s.Cmd.Process.Wait()
-						delete(sessionMap, module_name)
+
+					for {
+						func() {
+
+							lock.RLock()
+							defer lock.RUnlock()
+
+							if v, ok := sessionMap.LoadAndDelete(module_name); ok {
+
+								if s, ok := v.(*Session); ok {
+									syscall.Kill(s.Cmd.Process.Pid, syscall.SIGTERM)
+									ioutil.NopCloser(s.Stderr.data)
+									ioutil.NopCloser(s.Stdout.data)
+									s.Cmd.Process.Wait()
+								}
+
+							}
+
+						}()
 					}
+
 				case err, ok := <-watcher.Errors:
 					if !ok {
 						return
