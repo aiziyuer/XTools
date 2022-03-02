@@ -86,34 +86,32 @@ var mainCmd = &cobra.Command{
 
 						module_name := strings.TrimSuffix(file.Name(), filepath.Ext(file.Name()))
 
-						for {
-							func() {
+						func() {
 
-								lock.RLock()
-								defer lock.RUnlock()
+							lock.Lock()
+							defer lock.Unlock()
 
-								if _, ok := sessionMap.Load(module_name); !ok {
-									cmd := exec.Command(
-										"/usr/bin/stap",
-										"-g",
-										"-m",
-										fmt.Sprintf("__xtrace_%s", module_name),
-										fmt.Sprintf("/scripts/%s", file.Name()),
-									)
-									stdout, _ := cmd.StdoutPipe()
-									stderr, _ := cmd.StderrPipe()
-									cmd.SysProcAttr = &syscall.SysProcAttr{
-										Pdeathsig: syscall.SIGTERM, // 子进程跟随父进程一起停止
-									}
-									zap.S().Debugf("command:\n%s", cmd.String())
-									if err = cmd.Start(); err != nil {
-										zap.S().Errorf("cmd: %s has error: %s.", cmd, err)
-									}
-									sessionMap.Store(module_name, &Session{Cmd: cmd, Stdout: Std_out_err_t{stdout}, Stderr: Std_out_err_t{stderr}})
+							if _, ok := sessionMap.Load(module_name); !ok {
+								cmd := exec.Command(
+									"/usr/bin/stap",
+									"-g",
+									"-m",
+									fmt.Sprintf("__xtrace_%s", module_name),
+									fmt.Sprintf("/scripts/%s", file.Name()),
+								)
+								stdout, _ := cmd.StdoutPipe()
+								stderr, _ := cmd.StderrPipe()
+								cmd.SysProcAttr = &syscall.SysProcAttr{
+									Pdeathsig: syscall.SIGTERM, // 子进程跟随父进程一起停止
 								}
+								zap.S().Debugf("create session: %s, command:\n%s", module_name, cmd.String())
+								if err = cmd.Start(); err != nil {
+									zap.S().Errorf("cmd: %s has error: %s.", cmd, err)
+								}
+								sessionMap.Store(module_name, &Session{Cmd: cmd, Stdout: Std_out_err_t{stdout}, Stderr: Std_out_err_t{stderr}})
+							}
 
-							}()
-						}
+						}()
 
 					}
 				}
@@ -143,25 +141,26 @@ var mainCmd = &cobra.Command{
 					_, fileName := filepath.Split(event.Name)
 					module_name := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 
-					for {
-						func() {
+					zap.S().Debugf("file changed: %s, event: %s", fileName, event.Op.String())
 
-							lock.RLock()
-							defer lock.RUnlock()
+					func() {
 
-							if v, ok := sessionMap.LoadAndDelete(module_name); ok {
+						lock.Lock()
+						defer lock.Unlock()
 
-								if s, ok := v.(*Session); ok {
-									syscall.Kill(s.Cmd.Process.Pid, syscall.SIGTERM)
-									ioutil.NopCloser(s.Stderr.data)
-									ioutil.NopCloser(s.Stdout.data)
-									s.Cmd.Process.Wait()
-								}
+						if v, ok := sessionMap.LoadAndDelete(module_name); ok {
 
+							if s, ok := v.(*Session); ok {
+								zap.S().Debugf("delete session: %s", module_name)
+								syscall.Kill(s.Cmd.Process.Pid, syscall.SIGTERM)
+								ioutil.NopCloser(s.Stderr.data)
+								ioutil.NopCloser(s.Stdout.data)
+								s.Cmd.Process.Wait()
 							}
 
-						}()
-					}
+						}
+
+					}()
 
 				case err, ok := <-watcher.Errors:
 					if !ok {

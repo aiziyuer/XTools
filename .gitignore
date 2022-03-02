@@ -6,3 +6,4 @@ vendor/*
 output/*
 __debug_bin
 NVIDIAMate
+*.ko
