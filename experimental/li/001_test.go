@@ -1,4 +1,4 @@
-package leetcode
+package li
 
 import "testing"
 
