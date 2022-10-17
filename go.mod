@@ -15,6 +15,7 @@ require (
 	github.com/jasonlvhit/gocron v0.0.1
 	github.com/kardianos/service v1.2.0
 	github.com/magiconair/properties v1.8.4 // indirect
+	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/pelletier/go-toml v1.8.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
