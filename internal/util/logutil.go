@@ -1,7 +1,9 @@
 package util
 
 import (
+	"github.com/mitchellh/go-homedir"
 	"os"
+	"path"
 	"time"
 
 	"go.uber.org/zap"
@@ -9,8 +11,26 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// SetupLogs adds hooks to send logs to different destinations depending on level
-func SetupLogs(logFileName string) {
+func SetupLogsWithBinaryName(appName string, isDebug bool) {
+
+	homeDir, err := homedir.Dir()
+	if err != nil {
+		panic(err)
+	}
+	logFilePath := path.Join(homeDir, ".config", appName, "logs/info.log")
+
+	if isDebug {
+		SetupDefaultLogs(zapcore.DebugLevel, logFilePath)
+	} else {
+		SetupDefaultLogs(zapcore.InfoLevel, logFilePath)
+	}
+
+	zap.S().Infof("%s start, logs: %s", appName, logFilePath)
+	zap.S().Infof("debug log on/off: %v", isDebug)
+}
+
+// SetupDefaultLogs adds hooks to send logs to different destinations depending on level
+func SetupDefaultLogs(minLevel zapcore.Level, logFileName string) {
 	logger := zap.New(zapcore.NewTee(
 		zapcore.NewCore(zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
 			MessageKey:  "msg",

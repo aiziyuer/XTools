@@ -2,7 +2,6 @@ package xtunnel
 
 import (
 	util2 "app/internal/util"
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,11 +9,9 @@ import (
 	"regexp"
 
 	"github.com/avast/retry-go"
-	"github.com/gogf/gf/os/gfile"
 	"github.com/gogf/gf/util/gconv"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
-	"gopkg.in/yaml.v3"
 )
 
 type TunnelInfo struct {
@@ -30,6 +27,7 @@ type SessionInfo struct {
 	SshUser       string   `yaml:"ssh_user,omitempty"`
 	SshHost       string   `yaml:"ssh_host,omitempty"`
 	SshPort       int      `yaml:"ssh_port,omitempty"`
+	SshPassword   string   `yaml:"ssh_password"`
 	SshIdentity   string   `yaml:"ssh_identity"`
 	SshTunnelUris []string `yaml:"ssh_tunnels"`
 	SshTunnels    []TunnelInfo
@@ -38,28 +36,7 @@ type SessionInfo struct {
 type TunnelHandler struct {
 }
 
-func (t *TunnelHandler) Do() error {
-
-	var sessionInfos []*SessionInfo
-
-	decoder := yaml.NewDecoder(bytes.NewReader(gfile.GetBytes("configs/XTunnel.yaml")))
-	for {
-		var s SessionInfo
-		if err := decoder.Decode(&s); err != nil {
-			// Break when there are no more documents to decode
-			if err != io.EOF {
-				return err
-			}
-			break
-		}
-
-		// 忽略无效的记录
-		if len(s.SshUri) == 0 || len(s.SshHost) == 0 {
-			continue
-		}
-
-		sessionInfos = append(sessionInfos, &s)
-	}
+func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 
 	for _, session := range sessionInfos {
 		for _, tunnelUri := range session.SshTunnelUris {
@@ -94,6 +71,7 @@ func (t *TunnelHandler) Do() error {
 			Auth: []ssh.AuthMethod{
 				// put here your private key path
 				publicKeysByPrivateKeyContent(session.SshIdentity),
+				ssh.Password(session.SshPassword),
 			},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		}

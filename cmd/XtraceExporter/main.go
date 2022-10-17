@@ -3,6 +3,7 @@ package main
 import (
 	"app/internal/util"
 	"fmt"
+	zapcore2 "go.uber.org/zap/zapcore"
 	"io"
 	"io/ioutil"
 	"log"
@@ -195,7 +196,7 @@ func init() {
 }
 
 func main() {
-	util.SetupLogs(fmt.Sprintf("/var/log/%s/info.log", appName))
+	util.SetupDefaultLogs(zapcore2.InfoLevel, fmt.Sprintf("/var/log/%s/info.log", appName))
 	if err := mainCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

@@ -2,7 +2,12 @@ package main
 
 import (
 	"app/internal/xtunnel"
+	"bytes"
 	"fmt"
+	"github.com/gogf/gf/os/gfile"
+	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -25,7 +30,30 @@ func (p *program) Start(s service.Service) error {
 }
 func (p *program) run() {
 	h := &xtunnel.TunnelHandler{}
-	_ = h.Do()
+
+	var sessionInfos []*xtunnel.SessionInfo
+
+	decoder := yaml.NewDecoder(bytes.NewReader(gfile.GetBytes("configs/XTunnel.yaml")))
+	for {
+		var s xtunnel.SessionInfo
+		if err := decoder.Decode(&s); err != nil {
+			// Break when there are no more documents to decode
+			if err != io.EOF {
+				zap.S().Fatal(err)
+			}
+
+			break
+		}
+
+		// 忽略无效的记录
+		if len(s.SshUri) == 0 || len(s.SshHost) == 0 {
+			continue
+		}
+
+		sessionInfos = append(sessionInfos, &s)
+	}
+
+	_ = h.Do(sessionInfos)
 }
 func (p *program) Stop(s service.Service) error {
 	// Stop should not block. Return with a few seconds.
@@ -76,5 +104,4 @@ var serviceCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(serviceCmd)
-
 }

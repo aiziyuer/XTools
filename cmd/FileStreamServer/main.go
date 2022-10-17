@@ -4,6 +4,7 @@ import (
 	"app/internal/util"
 	"bufio"
 	"fmt"
+	zapcore2 "go.uber.org/zap/zapcore"
 	"io"
 	"log"
 	"math/rand"
@@ -77,7 +78,7 @@ func init() {
 }
 
 func main() {
-	util.SetupLogs("/var/log/FileStream/info.log")
+	util.SetupDefaultLogs(zapcore2.InfoLevel, "/var/log/FileStream/info.log")
 	if err := mainCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
