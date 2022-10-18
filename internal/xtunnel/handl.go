@@ -182,12 +182,14 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 							for {
 								session, err := serverConn.NewSession()
 								if err != nil {
-									zap.S().Fatal(err)
+									zap.S().Error(err)
+									return
 								}
 
 								_, err = session.Output("echo '1' ")
 								if err != nil {
-									zap.S().Fatal(err)
+									zap.S().Error(err)
+									return
 								}
 							}
 						}()
