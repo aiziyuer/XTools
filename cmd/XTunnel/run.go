@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	SshUri        = ""
-	SshPassword   = ""
-	SshTunnelUris []string
+	SshUri              = ""
+	SshPassword         = ""
+	SshTunnelStringList []string
 )
 
 func init() {
@@ -22,9 +22,9 @@ func init() {
 			h := &xtunnel.TunnelHandler{}
 			_ = h.Do([]*xtunnel.SessionInfo{
 				{
-					SshUri:        SshUri,
-					SshPassword:   SshPassword,
-					SshTunnelUris: SshTunnelUris,
+					SshUri:              SshUri,
+					SshPassword:         SshPassword,
+					SshTunnelStringList: SshTunnelStringList,
 				},
 			})
 
@@ -35,7 +35,7 @@ func init() {
 	rootCmd.AddCommand(runCommand)
 
 	runCommand.PersistentFlags().StringVar(&SshUri, "ssh_uri", "", "ssh uri")
-	runCommand.PersistentFlags().StringVar(&SshUri, "ssh_password", "", "ssh password")
-	runCommand.PersistentFlags().StringSliceVar(&SshTunnelUris, "ssh_tunnel_uri", []string{}, "ssh tunnel uri")
+	runCommand.PersistentFlags().StringVar(&SshPassword, "ssh_password", "", "ssh password")
+	runCommand.PersistentFlags().StringSliceVar(&SshTunnelStringList, "ssh_tunnels", []string{}, "ssh tunnel")
 
 }
