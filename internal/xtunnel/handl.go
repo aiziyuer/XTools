@@ -36,7 +36,7 @@ type SessionInfo struct {
 	SshPort             int      `yaml:"ssh_port,omitempty"`
 	SshPassword         string   `yaml:"ssh_password"`
 	SshIdentity         string   `yaml:"ssh_identity"`
-	ProxyUri            string   `yaml:"proxy_uri"`
+	SshProxyUri         string   `yaml:"ssh_proxy_uri"`
 	SshTunnelStringList []string `yaml:"ssh_tunnels"`
 	SshTunnels          []TunnelInfo
 }
@@ -238,7 +238,7 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 					}
 
 				}(
-					session.ProxyUri,
+					session.SshProxyUri,
 					fmt.Sprintf("%s:%d", session.SshHost, session.SshPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.RemoteHost, tunnelInfo.RemotePort),
@@ -324,7 +324,7 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 					}
 
 				}(
-					session.ProxyUri,
+					session.SshProxyUri,
 					fmt.Sprintf("%s:%d", session.SshHost, session.SshPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.RemoteHost, tunnelInfo.RemotePort),
@@ -391,7 +391,7 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 					}
 
 				}(
-					session.ProxyUri,
+					session.SshProxyUri,
 					fmt.Sprintf("%s:%d", session.SshHost, session.SshPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
 				)

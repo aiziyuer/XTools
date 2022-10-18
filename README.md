@@ -12,8 +12,9 @@
 cat <<EOF>~/.config/XTunnel.yaml
 # eg. [ssh_user]@[ssh_host]:[ssh_port]
 ssh_uri: root@127.0.0.1:22
-ssh_password: 
-ssh_identity: 
+ssh_password:
+ssh_identity:
+ssh_proxy_uri: 
 ssh_tunnels:
 # 监听端口: nc -lp 4444  查看端口: netstat -anp
 # R: 反向隧道, L: 正向隧道, D: ss代理, H: 原地http代理, S:原地ss代理
