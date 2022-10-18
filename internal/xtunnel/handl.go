@@ -205,6 +205,12 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 						}()
 
 						for {
+
+							in, err := listener.Accept()
+							if err != nil {
+								return err
+							}
+
 							out, err := net.Dial("tcp", dstEndpoint)
 							if err != nil {
 								zap.S().Errorf("Dial INTO local service error: %s", err)
@@ -212,11 +218,6 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 							}
 
 							zap.S().Infof("ssh_tunnel(R=>%s=>%s) build success.", srcEndpoint, dstEndpoint)
-
-							in, err := listener.Accept()
-							if err != nil {
-								return err
-							}
 
 							ch := make(chan error, 2)
 							go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
@@ -228,7 +229,6 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 						retry.Attempts(5),
 					)
 					if err != nil {
-
 						zap.S().Errorf("ssh_tunnel(R=>%s=>%s) build failed: %s.",
 							srcEndpoint,
 							dstEndpoint,
@@ -289,6 +289,11 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 
 						for {
 
+							in, err := listener.Accept()
+							if err != nil {
+								return err
+							}
+
 							// 打开远端的端口
 							out, err := serverConn.Dial("tcp", dstEndpoint)
 							if err != nil {
@@ -296,11 +301,6 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 									"open port(%s) ON remote server error: %s",
 									dstEndpoint,
 									err)
-								return err
-							}
-
-							in, err := listener.Accept()
-							if err != nil {
 								return err
 							}
 
