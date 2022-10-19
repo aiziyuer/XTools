@@ -9,7 +9,6 @@ import (
 	"github.com/elazarl/goproxy"
 	httpDialer "github.com/mwitkow/go-http-dialer"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -230,8 +229,8 @@ func (t *TunnelHandler) reverseTunnel(wg *sync.WaitGroup, sessionInfo *SessionIn
 			zap.S().Infof("ssh_tunnel(R=>%s=>%s) build success.", srcEndpoint, dstEndpoint)
 
 			ch := make(chan error, 2)
-			go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
-			go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
+			go func() { _, err := io.Copy(in, out); io.NopCloser(out); ch <- err }()
+			go func() { _, err := io.Copy(out, in); io.NopCloser(in); ch <- err }()
 
 		}
 
@@ -311,8 +310,8 @@ func (t *TunnelHandler) forwardTunnel(wg *sync.WaitGroup, sessionInfo *SessionIn
 			}
 
 			ch := make(chan error, 2)
-			go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
-			go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
+			go func() { _, err := io.Copy(in, out); io.NopCloser(out); ch <- err }()
+			go func() { _, err := io.Copy(out, in); io.NopCloser(in); ch <- err }()
 
 		}
 
@@ -478,8 +477,8 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 							}
 
 							ch := make(chan error, 2)
-							go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
-							go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
+							go func() { _, err := io.Copy(in, out); io.NopCloser(out); ch <- err }()
+							go func() { _, err := io.Copy(out, in); io.NopCloser(in); ch <- err }()
 
 						}
 
