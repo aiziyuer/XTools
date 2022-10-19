@@ -63,6 +63,22 @@ func (t *TunnelHandler) wrapperSessionInfo(sessionInfos []*SessionInfo) error {
 			session.SshPort = gconv.Int(util.GetAnyString(m["port"], "22"))
 		}
 
+		var authMethods []ssh.AuthMethod
+
+		if session.SshPassword != "" {
+			authMethods = append(authMethods, ssh.Password(session.SshPassword))
+		}
+
+		if session.SshIdentity != "" {
+			authMethods = append(authMethods, publicKeysByPrivateKeyContent(session.SshIdentity))
+		}
+
+		session.SshConfig = &ssh.ClientConfig{
+			User:            session.SshUser,
+			Auth:            authMethods,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		}
+
 		for _, tunnelUri := range session.SshTunnelStringList {
 			m := util.NamedStringSubMatch(
 				regexp.MustCompile(
@@ -300,29 +316,77 @@ func (t *TunnelHandler) forwardTunnel(wg *sync.WaitGroup, sessionInfo *SessionIn
 	}
 }
 
+func (t *TunnelHandler) localSocksProxy(wg *sync.WaitGroup, sessionInfo *SessionInfo, localEndpoint string) {
+
+	defer wg.Done()
+
+	err := retry.Do(func() error {
+
+		serverConn, err := t.getServerConn(
+			sessionInfo.SshProxyUri,
+			fmt.Sprintf("%s:%d", sessionInfo.SshHost, sessionInfo.SshPort),
+			sessionInfo.SshConfig,
+		)
+		if err != nil {
+			zap.S().Fatal(err)
+		}
+
+		go func(serverConn *ssh.Client) {
+			for {
+				session, err := serverConn.NewSession()
+				if err != nil {
+					zap.S().Error(err)
+					return
+				}
+
+				_, err = session.Output("echo '1' ")
+				if err != nil {
+					zap.S().Error(err)
+					return
+				}
+			}
+		}(serverConn)
+
+		defer func() {
+			_ = serverConn.Close()
+		}()
+
+		serverSocks, err := socks5.New(&socks5.Config{
+			Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return serverConn.Dial(network, addr)
+			},
+		})
+		if err != nil {
+			zap.S().Errorf("socks5 New error: %s", err)
+		}
+
+		zap.S().Infof("ssh_tunnel(D=>%s) build success.", localEndpoint)
+
+		if err := serverSocks.ListenAndServe("tcp", localEndpoint); err != nil {
+			zap.S().Errorf("failed to create socks5 server: %s", err)
+		}
+
+		return nil
+
+	},
+		retry.Attempts(5),
+	)
+
+	if err != nil {
+		zap.S().Errorf(
+			"ssh_tunnel(D=>%s) build failed: %s.",
+			localEndpoint,
+			err,
+		)
+	}
+}
+
 func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 
 	_ = t.wrapperSessionInfo(sessionInfos)
 
 	var wg sync.WaitGroup
 	for _, sessionInfo := range sessionInfos {
-
-		var authMethods []ssh.AuthMethod
-
-		if sessionInfo.SshPassword != "" {
-			authMethods = append(authMethods, ssh.Password(sessionInfo.SshPassword))
-		}
-
-		if sessionInfo.SshIdentity != "" {
-			authMethods = append(authMethods, publicKeysByPrivateKeyContent(sessionInfo.SshIdentity))
-		}
-
-		sshConfig := &ssh.ClientConfig{
-			User:            sessionInfo.SshUser,
-			Auth:            authMethods,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		}
-
 		for _, tunnelInfo := range sessionInfo.SshTunnels {
 			wg.Add(1)
 
@@ -347,74 +411,30 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 				)
 
 				continue
-			case "D":
-				go func(proxyUri, sshEndpoint, localEndpoint string) {
-					defer wg.Done()
+			case "LD":
 
-					err := retry.Do(func() error {
-
-						serverConn, err := t.getServerConn(proxyUri, sshEndpoint, sshConfig)
-						if err != nil {
-							zap.S().Fatal(err)
-						}
-
-						go func(serverConn *ssh.Client) {
-							for {
-								session, err := serverConn.NewSession()
-								if err != nil {
-									zap.S().Error(err)
-									return
-								}
-
-								_, err = session.Output("echo '1' ")
-								if err != nil {
-									zap.S().Error(err)
-									return
-								}
-							}
-						}(serverConn)
-
-						defer func() {
-							_ = serverConn.Close()
-						}()
-
-						serverSocks, err := socks5.New(&socks5.Config{
-							Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-								return serverConn.Dial(network, addr)
-							},
-						})
-						if err != nil {
-							zap.S().Errorf("socks5 New error: %s", err)
-						}
-
-						zap.S().Infof("ssh_tunnel(D=>%s) build success.", localEndpoint)
-
-						if err := serverSocks.ListenAndServe("tcp", localEndpoint); err != nil {
-							zap.S().Errorf("failed to create socks5 server: %s", err)
-						}
-
-						return nil
-
-					},
-						retry.Attempts(5),
-					)
-
-					if err != nil {
-						zap.S().Errorf(
-							"ssh_tunnel(D=>%s) build failed: %s.",
-							localEndpoint,
-							err,
-						)
-					}
-
-				}(
-					sessionInfo.SshProxyUri,
-					fmt.Sprintf("%s:%d", sessionInfo.SshHost, sessionInfo.SshPort),
-					fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
+				// 本地socks5代理
+				go t.localSocksProxy(
+					&wg,
+					sessionInfo, fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
 				)
 
 				continue
+
+			case "LH":
+
+				// 本地http代理
+				continue
+			case "RD":
+
+				// 远端socks5代理
+				continue
+			case "RH":
+
+				// 远端http代理
+				continue
 			}
+
 		}
 
 	}
