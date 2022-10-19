@@ -9,7 +9,8 @@
 ./XTunnel run -ssh_tunnels 'R=>0.0.0.0:3128=>localhost:3128' --ssh_uri root@aliyun.moyi-lc.com:22 --ssh_password XXXX
 
 # 批量建立隧道
-cat <<EOF>~/.config/XTunnel.yaml
+cat <<EOF>~/.config/XTunnel/XTunnel.yaml
+---
 # eg. [ssh_user]@[ssh_host]:[ssh_port]
 ssh_uri: root@127.0.0.1:22
 ssh_password:
@@ -22,6 +23,7 @@ ssh_tunnels:
 # - L=>0.0.0.0:12345=>localhost:22
 # - D=>0.0.0.0:11080
 # - H=>0.0.0.0:3128
+
 EOF
 ./XTunnel server
 

@@ -36,7 +36,7 @@ type SessionInfo struct {
 	SshPort             int      `yaml:"ssh_port,omitempty"`
 	SshPassword         string   `yaml:"ssh_password"`
 	SshIdentity         string   `yaml:"ssh_identity"`
-	SshProxyUri         string   `yaml:"ssh_proxy_uri"`
+	SshProxyUri         string   `yaml:"ssh_proxy_uri,omitempty"`
 	SshTunnelStringList []string `yaml:"ssh_tunnels"`
 	SshTunnels          []TunnelInfo
 }

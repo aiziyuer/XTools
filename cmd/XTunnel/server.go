@@ -25,7 +25,7 @@ func init() {
 
 			appName := global.AppConfig().GetAppName()
 			configFilePath, err := homedir.
-				Expand(fmt.Sprintf("~/.config/%s/%s-conf.yaml", appName, appName))
+				Expand(fmt.Sprintf("~/.config/%s/%s.yaml", appName, appName))
 			if err != nil {
 				zap.S().Fatal(err)
 			}
@@ -40,11 +40,6 @@ func init() {
 					}
 
 					break
-				}
-
-				// 忽略无效的记录
-				if len(s.SshUri) == 0 || len(s.SshHost) == 0 {
-					continue
 				}
 
 				sessionInfos = append(sessionInfos, &s)
