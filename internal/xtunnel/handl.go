@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"github.com/armon/go-socks5"
 	"github.com/avast/retry-go"
+	"github.com/elazarl/goproxy"
 	httpDialer "github.com/mwitkow/go-http-dialer"
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"net/url"
 	"regexp"
 	"sync"
@@ -82,7 +84,7 @@ func (t *TunnelHandler) wrapperSessionInfo(sessionInfos []*SessionInfo) error {
 		for _, tunnelUri := range session.SshTunnelStringList {
 			m := util.NamedStringSubMatch(
 				regexp.MustCompile(
-					`(?P<mode>(L|R|D))=>(?P<local_host>[^:]+):(?P<local_port>\d+)(=>(?P<remote_host>.+):(?P<remote_port>\d+))?`,
+					`(?P<mode>(L|RH|RD|R|LD|LH))=>(?P<host1>[^:]+):(?P<host1_port>\d+)(=>(?P<host2>.+):(?P<host2_port>\d+))?`,
 				),
 				tunnelUri)
 
@@ -92,13 +94,25 @@ func (t *TunnelHandler) wrapperSessionInfo(sessionInfos []*SessionInfo) error {
 			}
 
 			zap.S().Debugf("%s", gconv.Strings(m))
-			session.SshTunnels = append(session.SshTunnels, TunnelInfo{
-				Mode:       m["mode"],
-				LocalHost:  util.GetAnyString(m["local_host"], "0.0.0.0"),
-				LocalPort:  gconv.Int(m["local_port"]),
-				RemoteHost: util.GetAnyString(m["remote_host"], ""),
-				RemotePort: gconv.Int(util.GetAnyString(m["remote_port"], "-1")),
-			})
+
+			if gstr.Contains(m["mode"], "R") {
+				session.SshTunnels = append(session.SshTunnels, TunnelInfo{
+					Mode:       m["mode"],
+					LocalHost:  util.GetAnyString(m["host2"], "0.0.0.0"),
+					LocalPort:  gconv.Int(util.GetAnyString(m["host2_port"], "22")),
+					RemoteHost: util.GetAnyString(m["host1"], ""),
+					RemotePort: gconv.Int(util.GetAnyString(m["host1_port"], "22")),
+				})
+			} else {
+				session.SshTunnels = append(session.SshTunnels, TunnelInfo{
+					Mode:       m["mode"],
+					LocalHost:  util.GetAnyString(m["host1"], "0.0.0.0"),
+					LocalPort:  gconv.Int(util.GetAnyString(m["host1_port"], "22")),
+					RemoteHost: util.GetAnyString(m["host2"], ""),
+					RemotePort: gconv.Int(util.GetAnyString(m["host2_port"], "22")),
+				})
+			}
+
 		}
 	}
 	zap.S().Infof("sessionInfos: %s", gconv.Strings(sessionInfos))
@@ -401,6 +415,86 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 				)
 
 				continue
+			case "RD":
+
+				// 远端socks5代理
+				continue
+			case "RH": // 远端http代理
+
+				go func(endpoint string) {
+
+					err := retry.Do(func() error {
+
+						// ssh 链接建立
+						serverConn, err := t.getServerConn(
+							sessionInfo.SshProxyUri,
+							fmt.Sprintf("%s:%d", sessionInfo.SshHost, sessionInfo.SshPort),
+							sessionInfo.SshConfig,
+						)
+						if err != nil {
+							zap.S().Errorf("Dial INTO remote server error: %s", err)
+							return err
+						}
+
+						listener, err := serverConn.Listen("tcp", endpoint)
+
+						if err != nil {
+							zap.S().Errorf("Listen open port ON remote server error: %s", err)
+							return err
+						}
+
+						defer func() {
+							_ = listener.Close()
+							_ = serverConn.Close()
+						}()
+
+						listenerServer, err := net.Listen("tcp", "127.0.0.1:0")
+						if err != nil {
+							zap.S().Fatal(err)
+						}
+
+						go func() {
+
+							httpProxy := goproxy.NewProxyHttpServer()
+							httpProxy.Verbose = true
+
+							if err := http.Serve(listenerServer, httpProxy); err != nil {
+								zap.S().Fatal(err)
+							}
+
+						}()
+
+						for {
+
+							in, err := listener.Accept()
+							if err != nil {
+								return err
+							}
+
+							out, err := net.Dial("tcp", listenerServer.Addr().String())
+							if err != nil {
+								zap.S().Errorf("Dial INTO local service error: %s", err)
+								return err
+							}
+
+							ch := make(chan error, 2)
+							go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
+							go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
+
+						}
+
+					}, retry.Attempts(5))
+
+					if err != nil {
+						zap.S().Errorf("ssh_tunnel(RH=>%s) build failed: %s.",
+							endpoint,
+							err,
+						)
+					}
+
+				}(fmt.Sprintf("%s:%d", tunnelInfo.RemoteHost, tunnelInfo.RemotePort))
+
+				continue
 			case "L":
 
 				go t.forwardTunnel(
@@ -425,14 +519,7 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 
 				// 本地http代理
 				continue
-			case "RD":
 
-				// 远端socks5代理
-				continue
-			case "RH":
-
-				// 远端http代理
-				continue
 			}
 
 		}
