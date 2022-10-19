@@ -217,6 +217,89 @@ func (t *TunnelHandler) reverseTunnel(wg *sync.WaitGroup, sessionInfo *SessionIn
 	}
 }
 
+func (t *TunnelHandler) forwardTunnel(wg *sync.WaitGroup, sessionInfo *SessionInfo, srcEndpoint, dstEndpoint string) {
+	defer wg.Done()
+
+	err := retry.Do(func() error {
+
+		// ssh 链接建立
+		serverConn, err := t.getServerConn(
+			sessionInfo.SshProxyUri,
+			fmt.Sprintf("%s:%d", sessionInfo.SshHost, sessionInfo.SshPort),
+			sessionInfo.SshConfig,
+		)
+		if err != nil {
+			zap.S().Errorf("Dial INTO remote server error: %s", err)
+			return err
+		}
+
+		// 维持远程连接
+		go func() {
+			for {
+				session, err := serverConn.NewSession()
+				if err != nil {
+					zap.S().Fatal(err)
+				}
+
+				_, err = session.Output("echo '1' ")
+				if err != nil {
+					zap.S().Fatal(err)
+				}
+			}
+		}()
+
+		listener, err := net.Listen("tcp", srcEndpoint)
+		if err != nil {
+			zap.S().Errorf("Listen open port(%s) ON local server error: %s",
+				srcEndpoint,
+				err)
+			return err
+		}
+
+		defer func() {
+			_ = listener.Close()
+			_ = serverConn.Close()
+		}()
+
+		zap.S().Infof("ssh_tunnel(L=>%s=>%s) build success.", srcEndpoint, dstEndpoint)
+
+		for {
+
+			in, err := listener.Accept()
+			if err != nil {
+				return err
+			}
+
+			// 打开远端的端口
+			out, err := serverConn.Dial("tcp", dstEndpoint)
+			if err != nil {
+				zap.S().Errorf(
+					"open port(%s) ON remote server error: %s",
+					dstEndpoint,
+					err)
+				return err
+			}
+
+			ch := make(chan error, 2)
+			go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
+			go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
+
+		}
+
+	},
+		retry.Attempts(5),
+	)
+
+	if err != nil {
+		zap.S().Errorf(
+			"ssh_tunnel(L=>%s=>%s) build failed: %s.",
+			srcEndpoint,
+			dstEndpoint,
+			err,
+		)
+	}
+}
+
 func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 
 	_ = t.wrapperSessionInfo(sessionInfos)
@@ -255,93 +338,17 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 
 				continue
 			case "L":
-				go func(proxyUri, sshEndpoint, srcEndpoint, dstEndpoint string) {
-					defer wg.Done()
 
-					err := retry.Do(func() error {
-
-						// ssh 链接建立
-						serverConn, err := t.getServerConn(proxyUri, sshEndpoint, sshConfig)
-						if err != nil {
-							zap.S().Errorf("Dial INTO remote server error: %s", err)
-							return err
-						}
-
-						// 维持远程连接
-						go func() {
-							for {
-								session, err := serverConn.NewSession()
-								if err != nil {
-									zap.S().Fatal(err)
-								}
-
-								_, err = session.Output("echo '1' ")
-								if err != nil {
-									zap.S().Fatal(err)
-								}
-							}
-						}()
-
-						listener, err := net.Listen("tcp", srcEndpoint)
-						if err != nil {
-							zap.S().Errorf("Listen open port(%s) ON local server error: %s",
-								srcEndpoint,
-								err)
-							return err
-						}
-
-						defer func() {
-							_ = listener.Close()
-							_ = serverConn.Close()
-						}()
-
-						zap.S().Infof("ssh_tunnel(L=>%s=>%s) build success.", srcEndpoint, dstEndpoint)
-
-						for {
-
-							in, err := listener.Accept()
-							if err != nil {
-								return err
-							}
-
-							// 打开远端的端口
-							out, err := serverConn.Dial("tcp", dstEndpoint)
-							if err != nil {
-								zap.S().Errorf(
-									"open port(%s) ON remote server error: %s",
-									dstEndpoint,
-									err)
-								return err
-							}
-
-							ch := make(chan error, 2)
-							go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
-							go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
-
-						}
-
-					},
-						retry.Attempts(5),
-					)
-
-					if err != nil {
-						zap.S().Errorf(
-							"ssh_tunnel(L=>%s=>%s) build failed: %s.",
-							srcEndpoint,
-							dstEndpoint,
-							err,
-						)
-					}
-
-				}(
-					sessionInfo.SshProxyUri,
-					fmt.Sprintf("%s:%d", sessionInfo.SshHost, sessionInfo.SshPort),
+				go t.forwardTunnel(
+					&wg,
+					sessionInfo,
 					fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.RemoteHost, tunnelInfo.RemotePort),
 				)
+
 				continue
 			case "D":
-				go func(proxyUri, sshEndpoint, localEnpoint string) {
+				go func(proxyUri, sshEndpoint, localEndpoint string) {
 					defer wg.Done()
 
 					err := retry.Do(func() error {
@@ -380,9 +387,9 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 							zap.S().Errorf("socks5 New error: %s", err)
 						}
 
-						zap.S().Infof("ssh_tunnel(D=>%s) build success.", localEnpoint)
+						zap.S().Infof("ssh_tunnel(D=>%s) build success.", localEndpoint)
 
-						if err := serverSocks.ListenAndServe("tcp", localEnpoint); err != nil {
+						if err := serverSocks.ListenAndServe("tcp", localEndpoint); err != nil {
 							zap.S().Errorf("failed to create socks5 server: %s", err)
 						}
 
@@ -395,7 +402,7 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 					if err != nil {
 						zap.S().Errorf(
 							"ssh_tunnel(D=>%s) build failed: %s.",
-							localEnpoint,
+							localEndpoint,
 							err,
 						)
 					}
