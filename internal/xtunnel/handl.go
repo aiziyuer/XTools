@@ -30,13 +30,14 @@ type TunnelInfo struct {
 }
 
 type SessionInfo struct {
-	SshUri              string   `yaml:"ssh_uri"`
-	SshUser             string   `yaml:"ssh_user,omitempty"`
-	SshHost             string   `yaml:"ssh_host,omitempty"`
-	SshPort             int      `yaml:"ssh_port,omitempty"`
-	SshPassword         string   `yaml:"ssh_password"`
-	SshIdentity         string   `yaml:"ssh_identity"`
-	SshProxyUri         string   `yaml:"ssh_proxy_uri,omitempty"`
+	SshUri              string `yaml:"ssh_uri"`
+	SshUser             string `yaml:"ssh_user,omitempty"`
+	SshHost             string `yaml:"ssh_host,omitempty"`
+	SshPort             int    `yaml:"ssh_port,omitempty"`
+	SshPassword         string `yaml:"ssh_password"`
+	SshIdentity         string `yaml:"ssh_identity"`
+	SshProxyUri         string `yaml:"ssh_proxy_uri,omitempty"`
+	SshConfig           *ssh.ClientConfig
 	SshTunnelStringList []string `yaml:"ssh_tunnels"`
 	SshTunnels          []TunnelInfo
 }
@@ -137,114 +138,121 @@ func (t *TunnelHandler) getServerConn(proxyUri, sshEndpoint string, sshConfig *s
 	return serverConn, err
 }
 
+func (t *TunnelHandler) reverseTunnel(wg *sync.WaitGroup, sessionInfo *SessionInfo, srcEndpoint, dstEndpoint string) {
+
+	defer wg.Done()
+
+	err := retry.Do(func() error {
+
+		// ssh 链接建立
+		serverConn, err := t.getServerConn(
+			sessionInfo.SshProxyUri,
+			fmt.Sprintf("%s:%d", sessionInfo.SshHost, sessionInfo.SshPort),
+			sessionInfo.SshConfig,
+		)
+		if err != nil {
+			zap.S().Errorf("Dial INTO remote server error: %s", err)
+			return err
+		}
+
+		// 维持远程连接
+		go func() {
+			for {
+				session, err := serverConn.NewSession()
+				if err != nil {
+					zap.S().Error(err)
+					return
+				}
+
+				_, err = session.Output("echo '1' ")
+				if err != nil {
+					zap.S().Error(err)
+					return
+				}
+			}
+		}()
+
+		listener, err := serverConn.Listen("tcp", srcEndpoint)
+
+		if err != nil {
+			zap.S().Errorf("Listen open port ON remote server error: %s", err)
+			return err
+		}
+
+		defer func() {
+			_ = listener.Close()
+			_ = serverConn.Close()
+		}()
+
+		for {
+
+			in, err := listener.Accept()
+			if err != nil {
+				return err
+			}
+
+			out, err := net.Dial("tcp", dstEndpoint)
+			if err != nil {
+				zap.S().Errorf("Dial INTO local service error: %s", err)
+				return err
+			}
+
+			zap.S().Infof("ssh_tunnel(R=>%s=>%s) build success.", srcEndpoint, dstEndpoint)
+
+			ch := make(chan error, 2)
+			go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
+			go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
+
+		}
+
+	},
+		retry.Attempts(5),
+	)
+	if err != nil {
+		zap.S().Errorf("ssh_tunnel(R=>%s=>%s) build failed: %s.",
+			srcEndpoint,
+			dstEndpoint,
+			err,
+		)
+	}
+}
+
 func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 
 	_ = t.wrapperSessionInfo(sessionInfos)
 
 	var wg sync.WaitGroup
-	for _, session := range sessionInfos {
+	for _, sessionInfo := range sessionInfos {
 
 		var authMethods []ssh.AuthMethod
 
-		if session.SshPassword != "" {
-			authMethods = append(authMethods, ssh.Password(session.SshPassword))
+		if sessionInfo.SshPassword != "" {
+			authMethods = append(authMethods, ssh.Password(sessionInfo.SshPassword))
 		}
 
-		if session.SshIdentity != "" {
-			authMethods = append(authMethods, publicKeysByPrivateKeyContent(session.SshIdentity))
+		if sessionInfo.SshIdentity != "" {
+			authMethods = append(authMethods, publicKeysByPrivateKeyContent(sessionInfo.SshIdentity))
 		}
 
 		sshConfig := &ssh.ClientConfig{
-			User:            session.SshUser,
+			User:            sessionInfo.SshUser,
 			Auth:            authMethods,
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		}
 
-		for _, tunnelInfo := range session.SshTunnels {
+		for _, tunnelInfo := range sessionInfo.SshTunnels {
 			wg.Add(1)
 
 			switch tunnelInfo.Mode {
 			case "R":
-				go func(proxyUri, sshEndpoint, srcEndpoint, dstEndpoint string) {
-					defer wg.Done()
 
-					err := retry.Do(func() error {
-
-						// ssh 链接建立
-						serverConn, err := t.getServerConn(proxyUri, sshEndpoint, sshConfig)
-						if err != nil {
-							zap.S().Errorf("Dial INTO remote server error: %s", err)
-							return err
-						}
-
-						// 维持远程连接
-						go func() {
-							for {
-								session, err := serverConn.NewSession()
-								if err != nil {
-									zap.S().Error(err)
-									return
-								}
-
-								_, err = session.Output("echo '1' ")
-								if err != nil {
-									zap.S().Error(err)
-									return
-								}
-							}
-						}()
-
-						listener, err := serverConn.Listen("tcp", srcEndpoint)
-
-						if err != nil {
-							zap.S().Errorf("Listen open port ON remote server error: %s", err)
-							return err
-						}
-
-						defer func() {
-							_ = listener.Close()
-							_ = serverConn.Close()
-						}()
-
-						for {
-
-							in, err := listener.Accept()
-							if err != nil {
-								return err
-							}
-
-							out, err := net.Dial("tcp", dstEndpoint)
-							if err != nil {
-								zap.S().Errorf("Dial INTO local service error: %s", err)
-								return err
-							}
-
-							zap.S().Infof("ssh_tunnel(R=>%s=>%s) build success.", srcEndpoint, dstEndpoint)
-
-							ch := make(chan error, 2)
-							go func() { _, err := io.Copy(in, out); ioutil.NopCloser(out); ch <- err }()
-							go func() { _, err := io.Copy(out, in); ioutil.NopCloser(in); ch <- err }()
-
-						}
-
-					},
-						retry.Attempts(5),
-					)
-					if err != nil {
-						zap.S().Errorf("ssh_tunnel(R=>%s=>%s) build failed: %s.",
-							srcEndpoint,
-							dstEndpoint,
-							err,
-						)
-
-					}
-
-				}(
-					session.SshProxyUri,
-					fmt.Sprintf("%s:%d", session.SshHost, session.SshPort),
+				go t.reverseTunnel(
+					&wg,
+					sessionInfo,
 					fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.RemoteHost, tunnelInfo.RemotePort),
 				)
+
 				continue
 			case "L":
 				go func(proxyUri, sshEndpoint, srcEndpoint, dstEndpoint string) {
@@ -326,8 +334,8 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 					}
 
 				}(
-					session.SshProxyUri,
-					fmt.Sprintf("%s:%d", session.SshHost, session.SshPort),
+					sessionInfo.SshProxyUri,
+					fmt.Sprintf("%s:%d", sessionInfo.SshHost, sessionInfo.SshPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.RemoteHost, tunnelInfo.RemotePort),
 				)
@@ -393,8 +401,8 @@ func (t *TunnelHandler) Do(sessionInfos []*SessionInfo) error {
 					}
 
 				}(
-					session.SshProxyUri,
-					fmt.Sprintf("%s:%d", session.SshHost, session.SshPort),
+					sessionInfo.SshProxyUri,
+					fmt.Sprintf("%s:%d", sessionInfo.SshHost, sessionInfo.SshPort),
 					fmt.Sprintf("%s:%d", tunnelInfo.LocalHost, tunnelInfo.LocalPort),
 				)
 
