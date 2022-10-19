@@ -18,13 +18,14 @@ ssh_identity:
 ssh_proxy_uri: 
 ssh_tunnels:
 # 监听端口: nc -lp 4444  查看端口: netstat -anp
-# R: 反向隧道, L: 正向隧道, D: ss代理, H: 原地http代理, S:原地ss代理
+# R: 反向隧道, L: 正向隧道, 
+# RH: 远端http代理, LD: 本地socks5代理, RD: 远端socks5代理, LH: 本地http代理
 # - R=>0.0.0.0:13141=>localhost:3389
 # - L=>0.0.0.0:12345=>localhost:22
-# - LD=>0.0.0.0:11080
-# - LH=>0.0.0.0:3128
-# - RD=>0.0.0.0:11080
-# - RH=>0.0.0.0:3128
+# - RH=>0.0.0.0:3128 # done
+# - LD=>0.0.0.0:1080 # TODO
+# - LH=>0.0.0.0:3128 # TODO
+# - RD=>0.0.0.0:1080 # TODO
 EOF
 ./XTunnel server
 
